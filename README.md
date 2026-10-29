@@ -16,6 +16,24 @@ A Claude Code mod that shows your agents as a team of ten people working in a 3D
 - Node.js on your PATH (`node --version` should print a version). The office runs a small local server.
 - An internet connection the first time the page loads, to fetch three.js from a CDN.
 
+## Install from GitHub
+
+At a Claude Code prompt:
+
+```
+/plugin marketplace add malhar98p/3doffice
+/plugin install agent-office@agent-office
+```
+
+Or from a terminal:
+
+```
+claude plugin marketplace add malhar98p/3doffice
+claude plugin install agent-office@agent-office --scope user
+```
+
+Choose "user" scope when asked, so it works in every project, then start a new Claude Code session.
+
 ## Install from the zip
 
 1. Unzip `agent-office.zip` somewhere permanent, for example `~/claude-mods/agent-office`. Claude Code reads the plugin from that folder, so don't delete it.
