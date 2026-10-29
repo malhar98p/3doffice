@@ -1,0 +1,6 @@
+{
+  "name": "agent-office",
+  "version": "0.1.0",
+  "description": "A live office pane: each agent at a desk (on break when idle), what they are doing on hover, and the code-index brain lighting up as searches find files.",
+  "types": "./types/index.d.ts"
+}

@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="office-token" content="__OFFICE_TOKEN__">
+<title>Agent Office</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #e9ecf1; --ink: #1d2433; --ink-2: #5b6474; --ink-3: #8a93a3;
+    --card: rgba(255,255,255,.92); --solid: #ffffff; --line: rgba(20,30,50,.09); --field: #f2f4f7;
+    --shadow: 0 10px 30px rgba(20,30,50,.14); --accent: #2663eb; --accent-ink: #ffffff;
+    --working: #22c55e; --idle: #f59e0b; --you: #8b5cf6; --bubble: #f1f3f6;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1015; --ink: #e8ebf1; --ink-2: #aab2c0; --ink-3: #7c8595;
+    --card: rgba(24,27,34,.92); --solid: #171a21; --line: rgba(255,255,255,.08); --field: #20242d;
+    --shadow: 0 10px 30px rgba(0,0,0,.45); --accent: #4f86f7; --bubble: #232832;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink); font: 14px/1.4 Inter, -apple-system, system-ui, sans-serif; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  #scene { position: fixed; inset: 0; }
+  #scene canvas { display: block; outline: none; }
+
+  .card { background: var(--card); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-radius: 14px; box-shadow: var(--shadow); }
+  .hud { position: fixed; top: 14px; left: 14px; padding: 10px 14px; display: flex; gap: 14px; align-items: center; }
+  .hud h1 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+  .hud .counts { display: flex; gap: 12px; color: var(--ink-2); font-size: 12px; align-items: center; }
+  .bar { position: fixed; top: 14px; right: 14px; display: flex; gap: 8px; }
+  .btn { border: 0; background: var(--card); backdrop-filter: blur(14px); box-shadow: var(--shadow); border-radius: 12px; height: 38px; padding: 0 14px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+  .btn.icon { width: 38px; padding: 0; font-size: 16px; }
+  .btn:hover { filter: brightness(1.05); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); }
+  .view { position: fixed; right: 14px; bottom: 14px; display: grid; grid-template-columns: repeat(3, 38px); gap: 6px; }
+  .help { position: fixed; left: 14px; bottom: 14px; padding: 8px 12px; color: var(--ink-3); font-size: 12px; }
+
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--idle); flex: none; }
+  .dot.working { background: var(--working); box-shadow: 0 0 0 3px rgba(34,197,94,.25); }
+  .dot.you { background: var(--you); }
+
+  /* A dot over each head; it opens to the name on hover. */
+  .tag { display: flex; align-items: center; gap: 0; background: var(--card); border-radius: 999px; padding: 4px; box-shadow: 0 3px 10px rgba(0,0,0,.18); font-size: 12px; font-weight: 600; pointer-events: none; white-space: nowrap; transition: gap .18s, padding .18s; }
+  .tag .nm { max-width: 0; overflow: hidden; transition: max-width .2s ease; }
+  .tag.open { gap: 6px; padding: 4px 10px 4px 6px; }
+  .tag.open .nm { max-width: 140px; }
+  /* A badge for background tasks: always shown, so work left running is never invisible. */
+  .tag .bg { margin-left: 4px; font-size: 10.5px; font-weight: 700; color: #7c3aed; background: rgba(139, 92, 246, .14); border-radius: 999px; padding: 0 6px; }
+  .bgcount { color: #7c3aed; font-weight: 600; cursor: pointer; }
+  :root[data-theme="dark"] .tag .bg, :root[data-theme="dark"] .bgcount { color: #c4b5fd; }
+
+  .hover { position: fixed; z-index: 5; max-width: 300px; padding: 10px 12px; font-size: 12.5px; pointer-events: none; opacity: 0; transform: translateY(4px); transition: opacity .12s, transform .12s; }
+  .hover.show { opacity: 1; transform: none; }
+  .hover b { font-size: 13.5px; }
+  .muted { color: var(--ink-3); }
+
+  .panel { position: fixed; top: 0; bottom: 0; width: min(420px, 100vw); background: var(--solid); box-shadow: var(--shadow); display: flex; flex-direction: column; z-index: 10; transition: transform .28s cubic-bezier(.2,.8,.2,1); }
+  .panel.right { right: 0; transform: translateX(105%); }
+  .panel.left { left: 0; transform: translateX(-105%); }
+  .panel.open { transform: none; }
+  .panel header { padding: 16px 18px 12px; border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: flex-start; }
+  .panel h2 { margin: 0; font-size: 17px; }
+  .avatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 700; flex: none; }
+  .close { margin-left: auto; border: 0; background: var(--field); width: 30px; height: 30px; border-radius: 50%; font-size: 16px; cursor: pointer; color: var(--ink-2); flex: none; }
+  .meta { color: var(--ink-2); font-size: 12.5px; }
+  .tabs { display: flex; gap: 4px; padding: 6px 14px 0; border-bottom: 1px solid var(--line); }
+  .tabs button { border: 0; background: none; font-weight: 600; color: var(--ink-3); padding: 8px 10px; border-bottom: 2px solid transparent; cursor: pointer; }
+  .tabs button.on { color: var(--ink); border-color: var(--accent); }
+  .feed { flex: 1; overflow-y: auto; padding: 14px 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 88%; padding: 9px 12px; border-radius: 14px; white-space: pre-wrap; word-wrap: break-word; font-size: 13px; }
+  .msg.user { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+  .msg.assistant { align-self: flex-start; background: var(--bubble); border-bottom-left-radius: 4px; }
+  .toolrow { align-self: flex-start; display: flex; gap: 4px; flex-wrap: wrap; }
+  .toolrow span { font-size: 11px; color: var(--ink-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; }
+  .step { display: flex; gap: 10px; font-size: 13px; }
+  .step time { color: var(--ink-3); flex: none; width: 64px; }
+  .empty { color: var(--ink-3); text-align: center; margin-top: 30px; padding: 0 10px; }
+  .composer { border-top: 1px solid var(--line); padding: 10px 12px 12px; display: grid; gap: 6px; margin: 0; }
+  .composer .row { display: flex; gap: 8px; align-items: flex-end; }
+  .composer textarea { flex: 1; resize: none; min-height: 42px; max-height: 140px; border: 0; background: var(--field); border-radius: 12px; padding: 10px 12px; outline: none; }
+  .composer .hint { font-size: 11.5px; color: var(--ink-3); }
+
+  .team-list { flex: 1; overflow-y: auto; padding: 4px 14px 18px; }
+  .dept { margin: 14px 0 6px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+  .member { display: grid; grid-template-columns: 32px 1fr; gap: 10px; padding: 10px; border-radius: 12px; background: var(--field); margin-bottom: 8px; }
+  .member .avatar { width: 32px; height: 32px; font-size: 12px; }
+  .member .fields { display: grid; gap: 6px; min-width: 0; }
+  .member input, .member select { width: 100%; border: 1px solid var(--line); background: var(--solid); border-radius: 8px; padding: 6px 8px; min-width: 0; }
+  .member .duties { font-size: 11.5px; color: var(--ink-2); }
+  .member .acts { display: flex; gap: 12px; }
+  .link { border: 0; background: none; color: var(--accent); cursor: pointer; padding: 0; font-size: 12px; font-weight: 600; }
+  .link.danger { color: #e5484d; }
+
+  .view-sel, .say-session { border: 1px solid var(--line); background: var(--field); border-radius: 8px; padding: 5px 8px; font-size: 12.5px; }
+  .toasts { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); display: grid; gap: 6px; z-index: 20; pointer-events: none; }
+  .toast { padding: 9px 14px; font-size: 13px; animation: rise .25s ease; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+  .offline { position: fixed; top: 64px; left: 14px; padding: 8px 12px; font-size: 12.5px; display: none; }
+  @media (max-width: 600px) { .help, .hud .counts { display: none; } }
+  /* The Brain panel: wider than the Team window, its drawing themed by day and night. */
+  .panel.wide { width: min(700px, 100vw); }
+  .brain-body { flex: 1; overflow-y: auto; padding: 6px 16px 20px; --lobe: #f4f0ff; --lobe-edge: #7c3aed; --fold: #d6c9fb; --region: #6d28d9; --core: #ede4ff; }
+  :root[data-theme="dark"] .brain-body { --lobe: #2a2340; --lobe-edge: #8b5cf6; --fold: #3d3360; --region: #c4b5fd; --core: #3b2f63; }
+  .brain-svg { width: 100%; height: auto; display: block; }
+  .brain-svg .lobe-edge { fill: var(--lobe-edge); stroke: var(--lobe-edge); stroke-width: 7; }
+  .brain-svg .lobe { fill: var(--lobe); }
+  .brain-svg .fold { fill: none; stroke: var(--fold); stroke-width: 3; stroke-linecap: round; }
+  .brain-svg .stem { fill: var(--lobe); stroke: var(--lobe-edge); stroke-width: 3; }
+  .brain-svg .core { fill: var(--core); stroke: var(--lobe-edge); stroke-width: 2; }
+  .brain-svg .core.live { fill: #facc15; }
+  .brain-svg .core-label { font-size: 8px; font-weight: 700; fill: var(--region); }
+  .brain-svg .region .dot { fill: var(--core); stroke: var(--lobe-edge); stroke-width: 2; }
+  .brain-svg .region.hot .dot { fill: #8b5cf6; }
+  .brain-svg .region text { font-size: 10.5px; font-weight: 600; fill: var(--region); }
+  .brain-svg .person { cursor: pointer; }
+  .brain-svg .person .face { stroke: var(--solid); stroke-width: 3; }
+  .brain-svg .person .halo { fill: none; stroke: var(--working); stroke-width: 3; opacity: .8; }
+  .brain-svg .person .initial { font-size: 14px; font-weight: 700; fill: #fff; }
+  .brain-svg .person .initial.small { font-size: 9px; }
+  .brain-svg .person .nm { font-size: 11px; font-weight: 700; fill: var(--ink); }
+  .brain-svg .person .role { font-size: 9px; fill: var(--ink-3); }
+  .brain-svg .person .you { fill: var(--you); stroke: var(--solid); stroke-width: 3; }
+  .brain-svg .handoff { stroke: var(--ink-2); stroke-width: 1.8; fill: none; stroke-dasharray: 2 4; }
+  .brain-svg .arrowhead { fill: var(--ink-2); }
+  .brain-legend { display: flex; gap: 16px; justify-content: center; font-size: 11.5px; color: var(--ink-3); margin: 2px 0 6px; align-items: center; }
+  .brain-legend i { display: inline-block; width: 22px; height: 0; vertical-align: middle; margin-right: 4px; }
+  .lg-link { border-top: 2px dashed #8b5cf6; }
+  .lg-hand { border-top: 2px dotted var(--ink-2); }
+  .brain-body h3 { margin: 16px 0 6px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+  .flow-row { display: grid; grid-template-columns: 62px 1fr; gap: 1px 10px; padding: 8px 10px; margin: 0 0 6px calc(var(--depth) * 18px); border-radius: 10px; background: var(--field); cursor: pointer; font-size: 12.5px; border-left: 3px solid transparent; }
+  .flow-row.live { border-left-color: var(--working); }
+  .flow-row > :not(.flow-time) { grid-column: 2; }
+  .flow-time { color: var(--ink-3); font-size: 11.5px; grid-row: span 3; }
+  .flow-what { color: var(--ink-2); }
+  .flow-meta { color: var(--ink-3); font-size: 11.5px; display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
+  .flow-q { font-size: 12.5px; padding: 4px 2px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .brain-svg .bgbadge circle { fill: #7c3aed; stroke: var(--solid); stroke-width: 2; }
+  .brain-svg .bgbadge text { font-size: 9.5px; font-weight: 700; fill: #fff; }
+  .bglegend { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: #7c3aed; color: #fff; font-size: 9.5px; margin-right: 3px; }
+  .task-row { display: grid; grid-template-columns: 62px 1fr; gap: 2px 10px; padding: 8px 10px; margin-bottom: 6px; border-radius: 10px; background: var(--field); font-size: 12.5px; cursor: pointer; border-left: 3px solid #7c3aed; }
+  .task-row > :not(.task-state) { grid-column: 2; }
+  .task-row.ok { border-left-color: var(--working); } .task-row.bad { border-left-color: #e5484d; } .task-row.off { border-left-color: var(--ink-3); }
+  .task-state { grid-row: span 3; padding-top: 1px; }
+  .task-row code { font: 11px ui-monospace, Menlo, monospace; color: var(--ink-2); word-break: break-all; }
+  .pill { font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: rgba(120,120,140,.15); color: var(--ink-2); }
+  .pill.ok { background: rgba(34,197,94,.15); color: #15803d; } .pill.bad { background: rgba(229,72,77,.15); color: #c0262b; }
+  :root[data-theme="dark"] .pill.ok { color: #4ade80; } :root[data-theme="dark"] .pill.bad { color: #f87171; }
+  .spin { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid rgba(139,92,246,.3); border-top-color: #7c3aed; animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .chip { font-size: 10.5px; padding: 1px 7px; border-radius: 999px; background: rgba(139, 92, 246, .14); color: var(--region, #6d28d9); }
+  /* The view buttons move clear of an open drawer. */
+  body:has(#drawer.open) .view { right: calc(min(420px, 100vw) + 14px); }
+</style>
+</head>
+<body>
+  <div id="scene"></div>
+  <div class="hud card"><h1>Agent Office</h1><div class="counts" id="counts"></div><select id="viewSel" class="view-sel" hidden aria-label="Which sessions to show"></select></div>
+  <div class="bar">
+    <button class="btn" id="brainBtn" title="The code-index brain, who is using it, and the workflow">Brain</button>
+    <button class="btn" id="teamBtn" title="Names and roles">Team</button>
+    <button class="btn icon" id="themeBtn" title="Day or night"></button>
+  </div>
+  <div class="offline card" id="offline">Waiting for the session…</div>
+  <div class="help card">Drag to move · right-drag to turn · scroll to zoom · click someone to chat</div>
+  <div class="view">
+    <button class="btn icon" data-view="left" title="Turn left (Q)">⟲</button>
+    <button class="btn icon" data-view="in" title="Zoom in">＋</button>
+    <button class="btn icon" data-view="right" title="Turn right (E)">⟳</button>
+    <button class="btn icon" data-view="top" title="Look from above">⬒</button>
+    <button class="btn icon" data-view="out" title="Zoom out">－</button>
+    <button class="btn icon" data-view="home" title="Back to the whole office">⌂</button>
+  </div>
+  <div class="hover card" id="hover"></div>
+  <div class="toasts" id="toasts"></div>
+
+  <aside class="panel left" id="team" aria-label="Team">
+    <header><div><h2>Team</h2><div class="meta">Rename anyone or give them a new role — their department, desk and duties follow.</div></div><button class="close" id="teamClose" aria-label="Close">×</button></header>
+    <div class="team-list" id="teamList"></div>
+    <div class="composer"><button class="btn primary" id="hire">＋ Add a person</button></div>
+  </aside>
+
+  <aside class="panel left wide" id="brain" aria-label="Brain">
+    <header><div><h2>Brain</h2><div class="meta">The code index, the team around it, and who handed what to whom. Hover a region for its files; click a person to chat.</div></div><button class="close" id="brainClose" aria-label="Close">×</button></header>
+    <div class="brain-body" id="brainBody"></div>
+  </aside>
+
+  <aside class="panel right" id="drawer" aria-label="Conversation">
+    <header>
+      <div class="avatar" id="dAvatar"></div>
+      <div><h2 id="dName"></h2><div class="meta" id="dMeta"></div><div class="meta" id="dTask"></div></div>
+      <button class="close" id="dClose" aria-label="Close">×</button>
+    </header>
+    <div class="tabs"><button data-tab="chat" class="on">Chat</button><button data-tab="steps">Steps</button></div>
+    <div class="feed" id="feed"></div>
+    <form class="composer" id="composer">
+      <select id="saySession" class="say-session" hidden aria-label="Which session the message goes to"></select>
+      <div class="row"><textarea id="say" rows="1" placeholder="Message…"></textarea><button class="btn primary" type="submit">Send</button></div>
+      <div class="hint" id="sayHint"></div>
+    </form>
+  </aside>
+
+  <script type="importmap">
+    { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    } }
+  </script>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
